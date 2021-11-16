@@ -25,7 +25,6 @@ class MyConnection:
         global counter,total_data
         if isinstance(event, StreamDataReceived):
             data = event.data
-            print("counter",counter)
             counter += 1
             total_data += data
 
