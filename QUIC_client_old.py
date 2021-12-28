@@ -40,29 +40,21 @@ class MyClient(QuicConnectionProtocol):
         #print("ARGS.SIZE: " + str(_args.query_size))
         #stream_id = self._quic.get_next_available_stream_id()
         query = query.encode()
-        info = [query[i:i+950] for i in range(0, len(query), 950)]
-        stream_id = self._quic.get_next_available_stream_id()
-        p = 1
-        end_count = len(info)
-        for i in info:
-            #logger.debug(f"Stream ID: {stream_id}")
-            # Get number of bytes to be sent to calculate throughput
-            global total_bytes
-            total_bytes = sys.getsizeof(bytes(query))
-            #print("TOTAL BYTES: " + str(total_bytes))
-            # capture start time in seconds
-            global start
-            start = time.time()
-            end_stream = False
-            # Send the query to the server
-            #print("packet ",p,"count ",end_count)
-            if p==end_count:
-                end_stream = True
-            self._quic.send_stream_data(stream_id, bytes(i), end_stream)
-            p+=1
-            waiter = self._loop.create_future()
-            self._ack_waiter = waiter
-            self.transmit()
+        stream_id = self._quic.get_next_available_stream_id()   
+        logger.debug(f"Stream ID: {stream_id}")
+        # Get number of bytes to be sent to calculate throughput
+        global total_bytes
+        total_bytes = sys.getsizeof(bytes(query))
+        #print("TOTAL BYTES: " + str(total_bytes))
+        # capture start time in seconds
+        global start
+        start = time.time()
+        end_stream = False
+        # Send the query to the server
+        self._quic.send_stream_data(stream_id, bytes(query), True)
+        waiter = self._loop.create_future()
+        self._ack_waiter = waiter
+        self.transmit()
         return await asyncio.shield(waiter)
 
     # Define behavior when receiving a response from the server
@@ -83,6 +75,7 @@ class MyClient(QuicConnectionProtocol):
                 throughput = total_bits / total_time
 
             
+
                 # print response
                 answer = event.data
                 
@@ -91,7 +84,7 @@ class MyClient(QuicConnectionProtocol):
                 if event.end_stream:
                     self._ack_waiter = None
                     waiter.set_result(None)
-                    #print("end of received")
+#                    print("end of received")
 
 
 async def run(
@@ -114,7 +107,6 @@ async def run(
             await client.query(i)
         b = time.time()
         print("returned after query")
-        
         print(f'elapsed time: {b - a}')
         client.close()
 

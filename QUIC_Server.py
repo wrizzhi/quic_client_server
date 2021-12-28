@@ -13,6 +13,7 @@ from quic_logger import QuicDirectoryLogger
 
 logger = logging.getLogger("server")
 counter = 1
+dd = 0
 total_data = bytes()
 q= queue.Queue()
 
@@ -21,18 +22,27 @@ class MyConnection:
     def __init__(self, quic: QuicConnection):
         self._quic = quic
 
+    
     def handle_event(self, event: QuicEvent) -> None:
-        global counter,total_data
+        global counter,total_data,dd
         if isinstance(event, StreamDataReceived):
             data = event.data
             counter += 1
+            dd +=1
             total_data += data
+            test = "hello" + str(event.stream_id)
+            test = test.encode()
+            self._quic.send_stream_data(event.stream_id, test, False)
 
-            #print(data.decode())
+
+            #print(data.decode("latin-1"))
             #print("split data",sys.getsizeof(data))
             #end_stream = True
             #print("streamid",event.stream_id)
             if event.end_stream:
+                dd+=1
+                print("packet count",dd)
+                dd = 0
                 print("END STREAM",event.stream_id)
                 logger.info("END STREAM LOGGED")
                 print("final data",sys.getsizeof(total_data))
@@ -52,6 +62,7 @@ class MyServerProtocol(QuicConnectionProtocol):
     def quic_event_received(self, event: QuicEvent) -> None:
 
         #print("receieved a connection")
+        #python QUIC_Server.py -c keys/RootCA.crt -k keys/RootCA.key
         self._myConn = MyConnection(self._quic)
         self._myConn.handle_event(event)
 
@@ -98,8 +109,6 @@ def main():
         loop.run_forever()
     except KeyboardInterrupt:
         print(counter)
-        for i in range((q.qsize())):
-            print(i,"data")
         pass
 
 
