@@ -17,6 +17,7 @@ logger = logging.getLogger("client")
 
 id = 0
 dd = 0
+server_reply = list()
 # Define how the client should work. Inherits from QuicConnectionProtocol.
 # Override QuicEvent
 
@@ -54,14 +55,14 @@ class MyClient(QuicConnectionProtocol):
     def quic_event_received(self, event: QuicEvent) -> None:
         if self._ack_waiter is not None:
             if isinstance(event, StreamDataReceived):
-                global dd
+                global dd,server_reply
                 t4 = time.time()
                 dd+=1
                 waiter = self._ack_waiter
                 if event.end_stream:
                     dd = 0
                     data = event.data
-                    print(data.decode())
+                    #print(data.decode())
                     self._ack_waiter = None
                     waiter.set_result(None)
                 elif ( dd == 1):
@@ -69,7 +70,10 @@ class MyClient(QuicConnectionProtocol):
                     t2,t3 = answer.split(",",2)
                     mpd = ((float(t2)- float(self.t1)) + (t4 - float(t3)))/2
                     self.offset = (float(t2)- float(self.t1)) - mpd
-
+                else:
+                    reply = event.data.decode()
+                    server_reply.append(reply)
+                    print(reply)
                 #python QUIC_Client.py -k -qsize 50000 -v
 
                 

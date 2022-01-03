@@ -21,7 +21,7 @@ send_time = 0
 t2 = 0
 offset = 0 
 index = 0
-
+server_send_data = []
 
 
 
@@ -31,7 +31,7 @@ class MyConnection:
 
     
     def handle_event(self, event: QuicEvent) -> None:
-        global total_data,dd,send_time,t2,offset,index
+        global total_data,dd,send_time,t2,offset,index,server_send_data
         
         if isinstance(event, StreamDataReceived):
             data = event.data
@@ -60,6 +60,12 @@ class MyConnection:
                 ts_data = ts_data.encode()
                 self._quic.send_stream_data(event.stream_id, ts_data, False)
                 total_data += data
+            else:
+                if (len(server_send_data) > 0 ):
+                    sever_reply = server_send_data.pop(0)
+                    if isinstance(sever_reply,str):
+                        sever_reply = sever_reply.encode()
+                    self._quic.send_stream_data(event.stream_id, sever_reply, False)
          
                 
             
@@ -107,8 +113,10 @@ class quicserver(MyServerProtocol):
         
         self.y.start()
 
-    def server_send(self,id,data):
-        self.s_send(id,data)
+    def server_send(self,data):
+        global server_send_data
+        server_send_data.append(data)
+
         
 
     def quicrecieve(self):
@@ -160,13 +168,15 @@ def processing(server,data_queue):
             t2 = time.time()
         
             if ( frame["time_taken"] + (t2 - frame["t1"]) < 0.15):
-                time.sleep(0.03)
                 print("frame ",frame["id"]," processing")
-                #server.quic_obj.server_send(f_id,"processed")
+                time.sleep(0.03)
+                server_reply = frame["id"] + "processed"
+                server.quic_obj.server_send(server_reply)
                 time_start = time.time()
             else:
                 print("frame ",frame["id"]," dropped")
-                #server.quic_obj.server_send(f_id,"dropped")
+                server_reply = frame["id"] + "dropped"
+                server.quic_obj.server_send(server_reply)
 
 def main():
     print("entered server code")
@@ -177,7 +187,7 @@ def main():
     j = quicconnectserver(args.host,args.port,args.certificate, args.private_key,args.verbose)
     prc_thread = threading.Thread(target=processing,args=(j,data_queue))
     prc_thread.start()
-    
+    counter = 0
     while True:
         id,f,t=j.quic_obj.recieve()
         if id:
@@ -186,11 +196,13 @@ def main():
             temp["time_taken"] = t
             temp["t1"] = time.time()
             temp["id"] = id
-            #print("frame",id,"time",t)
+            print("frame",id,"time",t)
             data_queue.put(temp)
             
         else:
-            print("End of data recieved")
+            if counter > 10:
+                exit()
+            counter+=1
             
             
 
