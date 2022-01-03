@@ -1,9 +1,10 @@
 import ParserServer
-import asyncio, sys
+import asyncio
 import logging
 import ssl
 import time
 import queue
+import threading
 from aioquic.asyncio import QuicConnectionProtocol, serve
 from aioquic.quic.configuration import QuicConfiguration
 from aioquic.quic.connection import QuicConnection
@@ -15,10 +16,11 @@ from quic_logger import QuicDirectoryLogger
 logger = logging.getLogger("server")
 dd = 0
 total_data = bytes()
-q= queue.Queue()
+frame_data = []
 send_time = 0
 t2 = 0
 offset = 0 
+index = 0
 
 
 
@@ -28,38 +30,39 @@ class MyConnection:
 
     
     def handle_event(self, event: QuicEvent) -> None:
-        global total_data,dd,send_time,t2,offset
+        global total_data,dd,send_time,t2,offset,index
         
         if isinstance(event, StreamDataReceived):
             data = event.data
-            
-           
             dd +=1
-            if  ( dd == 1):
-                #print("first",data.decode())
+            if event.end_stream:
+                dd = 0
+                time_taken = float(t2) - float(send_time) + float(offset)
+                if time_taken < 0:
+                    print("here")
+                    time_taken = float(t2) - float(send_time)
+                total_data += data
+                temp = dict()
+                temp["data"] = total_data
+                temp["id"] = index
+                temp["time_taken"] = time_taken
+                frame_data.append(temp)
+                total_data = bytes()
+                ack = "frame " + str(index) + " recieved"
+                self._quic.send_stream_data(event.stream_id, bytes(ack.encode()), True)
+            elif  ( dd == 1):
                 send_time,offset,index,data=data.decode('latin-1').split(",",3)
-                #print("s",send_time)
-                #print("o",offset)
-                print("frame",index,"recieved")
                 t2 = str(time.time())
                 data = data.encode()
                 t3 = str(time.time())
-                test = t2 +"," + t3 + "," + "hello   " + str(event.stream_id) +"\n"
-                test = test.encode()
-                self._quic.send_stream_data(event.stream_id, test, False)
-            total_data += data
-            if event.end_stream:
-                dd = 0
-        
-                #print("END STREAM",event.stream_id)
-                #logger.info("END STREAM LOGGED")
-                print("final data",sys.getsizeof(total_data))
-                #print("total_data",total_data)
-                #print("send_time",send_time)
-                print("time_taken",float(t2) - float(send_time) + float(offset))
-                q.put(total_data)
-                total_data = bytes()
-                self._quic.send_stream_data(event.stream_id, bytes("git all".encode()), True)
+                ts_data = t2 + "," + t3 
+                ts_data = ts_data.encode()
+                self._quic.send_stream_data(event.stream_id, ts_data, False)
+                total_data += data
+         
+                
+            
+            
    
 
 
@@ -77,45 +80,93 @@ class MyServerProtocol(QuicConnectionProtocol):
         self._myConn = MyConnection(self._quic)
         self._myConn.handle_event(event)
 
+class quicserver(MyServerProtocol):
+    def __init__(self, host, port, configuration):
+        super().__init__(self)
+        self.host = host
+        self.port = port
+        self.config = configuration
+        self.server_start()
+
+    
+    def recieve(self):
+        t1 = time.time()
+        while True and (time.time() - t1) < 15:
+            if (len(frame_data) > 0 ):
+                t1 = time.time()
+                temp = frame_data.pop(0)
+                frame_ret = temp["data"]
+                frame_time = temp["time_taken"]
+                frame_index = temp["id"]
+                return frame_index,frame_ret,frame_time
+        return None,None,None
+        
+    def server_start(self):
+        self.y = threading.Thread(target=self.quicrecieve)
+        self.y.setDaemon(True)
+        self.y.start()
+
+    def server_send(self,id,data):
+        self.s_send(id,data)
+        
+
+    def quicrecieve(self):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(
+        serve(
+            self.host,
+            self.port,
+            configuration=self.config,
+            create_protocol=MyServerProtocol
+            )
+        )
+        try:
+            loop.run_forever()
+        except KeyboardInterrupt:
+            exit()
+            pass
+
+class quicconnectserver():
+    def __init__(self, host, port,certificate,private_key,verbose,qlog=None):
+            logging.basicConfig(
+            format="%(asctime)s %(levelname)s %(name)s %(message)s",
+            level=logging.DEBUG if verbose else logging.INFO,)
+            if qlog:
+                self.configuration = QuicConfiguration(is_client=False, quic_logger=QuicDirectoryLogger(qlog)) 
+            else:
+                self.configuration = QuicConfiguration(is_client=False, quic_logger=None) 
+            self.configuration.load_cert_chain(certificate, private_key)
+            self.configuration.verify_mode = ssl.CERT_NONE
+            self.hostip = host
+            self.portnr = port
+            self.quic_obj = self.create_quic_server_object()
+    
+    def create_quic_server_object(self):
+            return   quicserver(self.hostip,self.portnr,configuration=self.configuration)
+
+
 
 def main():
     print("entered server code")
 
+    data = dict()
     args = ParserServer.parse("Parse server args")
-
-    logging.basicConfig(
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
-        level=logging.DEBUG if args.verbose else logging.INFO,
-    )
-
-    if args.quic_log:
-        quic_logger = QuicDirectoryLogger(args.quic_log)
-    else:
-        quic_logger = None
-
-    configuration = QuicConfiguration(
-        is_client=False, quic_logger=quic_logger
-    )
-
-    configuration.load_cert_chain(args.certificate, args.private_key)
-
-
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(
-        serve(
-            args.host,
-            args.port,
-            configuration=configuration,
-            create_protocol=MyServerProtocol
-        )
-    )
-
-    try:
-        loop.run_forever()
-    except KeyboardInterrupt:
-        print(q.qsize())
-        pass
-
+    
+    j = quicconnectserver(args.host,args.port,args.certificate, args.private_key,args.verbose)
+   
+    while True:
+        id,f,t=j.quic_obj.recieve()
+        if id:
+            temp = dict()
+            temp["frame"] = f
+            temp["time_taken"] = t
+            temp["t1"] = time.time()
+            data[id] = temp
+            print("frame",id,"time",t)
+        else:
+            print("End of data recieved")
+            
 
 if __name__ == "__main__":
     main()

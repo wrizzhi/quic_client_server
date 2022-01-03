@@ -1,8 +1,6 @@
 import logging
-import queue
 import ssl
 import asyncio
-import sys
 import time
 from typing import Optional, cast
 import threading
@@ -11,19 +9,13 @@ from aioquic.asyncio import QuicConnectionProtocol
 from aioquic.quic.configuration import QuicConfiguration
 from aioquic.asyncio.client import connect
 from aioquic.quic.events import QuicEvent, StreamDataReceived
-from timeit import default_timer as timer
 
 import ParserClient
 from quic_logger import QuicDirectoryLogger
 
 logger = logging.getLogger("client")
 
-# Globals for throughput calculation
-input_data = queue.Queue()
-total_bytes = 0
-id = -1
-start = 0
-end = 0
+id = 0
 dd = 0
 # Define how the client should work. Inherits from QuicConnectionProtocol.
 # Override QuicEvent
@@ -36,7 +28,7 @@ class MyClient(QuicConnectionProtocol):
         self.offset = 0
     
     def insert_timestamp(self,data,index):
-        #inserting the offset and send time
+        #inserting the offset,send time,index
         self.t1 =  time.time()
         header = str(self.t1) +  "," + str(self.offset) + "," + str(index) + ","
         header = header.encode()
@@ -45,19 +37,13 @@ class MyClient(QuicConnectionProtocol):
 
     # Assemble a query to send to the server
     async def query(self,data,index) -> None:
-        #print("ct",ct)
+        
         query = data
         if isinstance(query,str):
             query = query.encode()
         stream_id = self._quic.get_next_available_stream_id()   
         logger.debug(f"Stream ID: {stream_id}")
-        
-        global start
-        start = time.time()
-        # Send the query to the server
         query = self.insert_timestamp(query,index)
-        #total_bytes = sys.getsizeof(bytes(query))
-        #print("TOTAL BYTES: " + str(total_bytes))
         self._quic.send_stream_data(stream_id, bytes(query), True)
         waiter = self._loop.create_future()
         self._ack_waiter = waiter
@@ -68,41 +54,26 @@ class MyClient(QuicConnectionProtocol):
     def quic_event_received(self, event: QuicEvent) -> None:
         if self._ack_waiter is not None:
             if isinstance(event, StreamDataReceived):
+                global dd
                 t4 = time.time()
-                # get timestamp in seconds and convert to MS
-                global end,dd
-                end = time.time()
-                #print("reply",event.data.decode())
                 dd+=1
-                if ( dd == 1):
-                    answer = event.data.decode()
-                    t2,t3,rest = answer.split(",",2)
-                    #print("t2",t2)
-                    #print("t3",t3)
-                    #print("rest",rest)
-                    mpd = ((float(t2)- float(self.t1)) + (t4 - float(t3)))/2
-                    self.offset = (float(t2)- float(self.t1)) - mpd
-                    #print("offset",self.offset)
-
-
-                # calculate throughput and write to file
-                #python QUIC_Client.py -k -qsize 50000 -v
-                # convert bytes to bits, then to megabits to measure in megabits per second
-                total_time = end - start
-                total_bits = (total_bytes * 8) / 1e+6
-                throughput = total_bits / total_time
-
-            
-
-              
-                
-                #print(answer.decode())
                 waiter = self._ack_waiter
                 if event.end_stream:
                     dd = 0
+                    data = event.data
+                    print(data.decode())
                     self._ack_waiter = None
                     waiter.set_result(None)
-#                    print("end of received")
+                elif ( dd == 1):
+                    answer = event.data.decode()
+                    t2,t3 = answer.split(",",2)
+                    mpd = ((float(t2)- float(self.t1)) + (t4 - float(t3)))/2
+                    self.offset = (float(t2)- float(self.t1)) - mpd
+
+                #python QUIC_Client.py -k -qsize 50000 -v
+
+                
+
 
 
 
@@ -114,6 +85,7 @@ class quicconnect(MyClient):
         self.port_nr = port_nr
         self.configuration =configuration
         self.frame_hist = list()
+        self.closed = False
         self.start_thread()
     
 
@@ -126,8 +98,10 @@ class quicconnect(MyClient):
     
     def send_frame(self,frame):
         self.frame_hist.append(frame)
-
-            
+    
+    def client_close(self):
+        self.closed = True
+         
             
 
     async def run(self):
@@ -146,8 +120,11 @@ class quicconnect(MyClient):
                         data = self.frame_hist.pop(0)
                         await self.client.query(data,id)  
                   else:
-                      if (time.time() - curr_time > 2 ):
-                          print("Timeout")
+                      if (time.time() - curr_time > 2 ): 
+                          print("Timeout ")
+                          break
+                      elif(self.closed):
+                          print("Client Closed")
                           break
                       
                           
@@ -190,16 +167,17 @@ def main():
     print("started")
     args = ParserClient.parse("Parse client args")
     test_data = []
-    for i in range(0,20):
+    for i in range(0,10):
         q = randbytes(n=50000)
         test_data.append(q)
-    global _args
-    _args = args
+
     k = quicconnectclient(args.host,args.port,args.verbose)
       
     for i in test_data:   
         k.quic_obj.send_frame(i)
         time.sleep(0.03)
+
+    k.quic_obj.client_close()
 
 if __name__ == "__main__":
     main()
