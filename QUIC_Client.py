@@ -124,7 +124,7 @@ class quicconnect(MyClient):
                         data = self.frame_hist.pop(0)
                         await self.client.query(data,id)  
                   else:
-                      if (time.time() - curr_time > 2 ): 
+                      if (time.time() - curr_time > 15 ): 
                           print("Timeout ")
                           break
                       elif(self.closed):

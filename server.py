@@ -17,7 +17,7 @@ def processing(server,data_queue):
             t2 = time.time()
         
             if ( frame["time_taken"] + (t2 - frame["t1"]) < 0.15):
-                print("frame ",frame["id"]," processing")
+                #print("frame ",frame["id"]," processing")
                 time.sleep(0.03)
                 server_reply = frame["id"] + "processed"
                 server.quic_obj.server_send(server_reply)
@@ -28,7 +28,7 @@ def processing(server,data_queue):
                 server.quic_obj.server_send(server_reply)
 
 def main():
-    print("entered server code")
+    #print("entered server code")
 
     
     args = ParserServer.parse("Parse server args")
@@ -45,7 +45,7 @@ def main():
             temp["time_taken"] = t
             temp["t1"] = time.time()
             temp["id"] = id
-            print("frame",id,"time",t)
+            #print("frame",id,"time",t)
             data_queue.put(temp)
             
         else:

@@ -2,6 +2,7 @@ import random,itertools,struct
 import ParserClient
 from QUIC_client import quicconnectclient
 import time
+import sys
 
 
 
@@ -23,17 +24,19 @@ def main():
     print("started")
     args = ParserClient.parse("Parse client args")
     test_data = []
-    for i in range(0,10):
+    for i in range(0,100000):
         q = randbytes(n=50000)
         test_data.append(q)
-
+    print(sys.getsizeof(test_data[0]))
     k = quicconnectclient(args.host,args.port,args.verbose)
       
     for i in test_data:   
+        #print(i)
+
         k.quic_obj.send_frame(i)
         time.sleep(0.03)
 
-    k.quic_obj.client_close()
+    #k.quic_obj.client_close()
 
 if __name__ == "__main__":
     main()

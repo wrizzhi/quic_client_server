@@ -40,6 +40,7 @@ class MyConnection:
                 if time_taken < 0:
                     time_taken = float(t2) - float(send_time)
                 total_data += data
+                print(offset)
                 temp = dict()
                 temp["data"] = total_data
                 temp["id"] = index
