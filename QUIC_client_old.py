@@ -23,7 +23,7 @@ total_bytes = 0
 id = 0
 start = 0
 end = 0
-
+dd = 0
 # Define how the client should work. Inherits from QuicConnectionProtocol.
 # Override QuicEvent
 
@@ -32,6 +32,15 @@ class MyClient(QuicConnectionProtocol):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._ack_waiter: Optional[asyncio.Future[None]] = None
+        self.offset = 0
+    
+    def insert_timestamp(self,data):
+        #inserting the offset and send time
+        self.t1 =  time.time()
+        header = str(self.t1) +  "," + str(self.offset) + ","
+        header = header.encode()
+        data = header + data
+        return data
 
     # Assemble a query to send to the server
     async def query(self,ct) -> None:
@@ -49,8 +58,10 @@ class MyClient(QuicConnectionProtocol):
         # capture start time in seconds
         global start
         start = time.time()
-        end_stream = False
         # Send the query to the server
+        query = self.insert_timestamp(query)
+        #total_bytes = sys.getsizeof(bytes(query))
+        #print("TOTAL BYTES: " + str(total_bytes))
         self._quic.send_stream_data(stream_id, bytes(query), True)
         waiter = self._loop.create_future()
         self._ack_waiter = waiter
@@ -61,11 +72,22 @@ class MyClient(QuicConnectionProtocol):
     def quic_event_received(self, event: QuicEvent) -> None:
         if self._ack_waiter is not None:
             if isinstance(event, StreamDataReceived):
-
+                t4 = time.time()
                 # get timestamp in seconds and convert to MS
-                global end
+                global end,dd
                 end = time.time()
                 #print("reply",event.data.decode())
+                dd+=1
+                if ( dd == 1):
+                    answer = event.data.decode()
+                    t2,t3,rest = answer.split(",",2)
+                    #print("t2",t2)
+                    #print("t3",t3)
+                    #print("rest",rest)
+                    mpd = ((float(t2)- float(self.t1)) + (t4 - float(t3)))/2
+                    self.offset = (float(t2)- float(self.t1)) - mpd
+                    #print("offset",self.offset)
+
 
                 # calculate throughput and write to file
                 #python QUIC_Client.py -k -qsize 50000 -v
@@ -76,12 +98,12 @@ class MyClient(QuicConnectionProtocol):
 
             
 
-                # print response
-                answer = event.data
+              
                 
                 #print(answer.decode())
                 waiter = self._ack_waiter
                 if event.end_stream:
+                    dd = 0
                     self._ack_waiter = None
                     waiter.set_result(None)
 #                    print("end of received")
@@ -103,7 +125,7 @@ async def run(
         logger.debug("Sending query")
         print("starting timer")
         a = time.time()
-        for i in range(0,1):
+        for i in range(0,10):
             await client.query(i)
         b = time.time()
         print("returned after query")

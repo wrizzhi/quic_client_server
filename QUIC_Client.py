@@ -86,7 +86,7 @@ class MyClient(QuicConnectionProtocol):
                 # print response
                 answer = event.data
                 
-                #print(answer.decode())
+                print(answer.decode())
                 waiter = self._ack_waiter
                 if event.end_stream:
                     self._ack_waiter = None
@@ -110,7 +110,7 @@ async def run(
         logger.debug("Sending query")
         print("starting timer")
         a = time.time()
-        for i in range(0,1):
+        for i in range(0,5):
             await client.query(i)
         b = time.time()
         print("returned after query")

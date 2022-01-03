@@ -2,6 +2,7 @@ import ParserServer
 import asyncio, sys
 import logging
 import ssl
+import time
 import queue
 from aioquic.asyncio import QuicConnectionProtocol, serve
 from aioquic.quic.configuration import QuicConfiguration
@@ -16,6 +17,10 @@ counter = 1
 dd = 0
 total_data = bytes()
 q= queue.Queue()
+send_time = 0
+t2 = 0
+offset = 0 
+
 
 
 class MyConnection:
@@ -24,33 +29,39 @@ class MyConnection:
 
     
     def handle_event(self, event: QuicEvent) -> None:
-        global counter,total_data,dd
+        global counter,total_data,dd,send_time,t2,offset
+        
         if isinstance(event, StreamDataReceived):
             data = event.data
+            
             counter += 1
             dd +=1
+            if  ( dd == 1):
+                #print("first",data.decode())
+                send_time,offset,data=data.decode().split(",",2)
+                #print("s",send_time)
+                #print("o",offset)
+                #print("r",data)
+                t2 = str(time.time())
+                data = data.encode()
+                t3 = str(time.time())
+                test = t2 +"," + t3 + "," + "hello   " + str(event.stream_id) +"\n"
+                test = test.encode()
+                self._quic.send_stream_data(event.stream_id, test, False)
             total_data += data
-            test = "hello" + str(event.stream_id)
-            test = test.encode()
-            self._quic.send_stream_data(event.stream_id, test, False)
-
-
-            #print(data.decode("latin-1"))
-            #print("split data",sys.getsizeof(data))
-            #end_stream = True
-            #print("streamid",event.stream_id)
             if event.end_stream:
-                dd+=1
-                print("packet count",dd)
                 dd = 0
-                print("END STREAM",event.stream_id)
-                logger.info("END STREAM LOGGED")
-                print("final data",sys.getsizeof(total_data))
+        
+                #print("END STREAM",event.stream_id)
+                #logger.info("END STREAM LOGGED")
+                #print("final data",sys.getsizeof(total_data))
+                #print("total_data",total_data)
+                #print("send_time",send_time)
+                print("time_taken",float(t2) - float(send_time) + float(offset))
                 q.put(total_data)
                 total_data = bytes()
-                self._quic.send_stream_data(event.stream_id, bytes(data), True)
-    def server_reply(self):
-        stream_id = self._quic.get_next_available_stream_id()
+                self._quic.send_stream_data(event.stream_id, bytes("git all".encode()), True)
+   
 
 
 class MyServerProtocol(QuicConnectionProtocol):
@@ -58,6 +69,7 @@ class MyServerProtocol(QuicConnectionProtocol):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._myConn: Optional[MyConnection] = None
+        
 
     def quic_event_received(self, event: QuicEvent) -> None:
 
@@ -65,12 +77,6 @@ class MyServerProtocol(QuicConnectionProtocol):
         #python QUIC_Server.py -c keys/RootCA.crt -k keys/RootCA.key
         self._myConn = MyConnection(self._quic)
         self._myConn.handle_event(event)
-
-        """if isinstance(event, ProtocolNegotiated):
-            if event.alpn_protocol in DnsServerProtocol.SUPPORTED_ALPNS:
-                self._dns = DnsConnection(self._quic)
-        if self._dns is not None:
-            self._dns.handle_event(event)"""
 
 
 def main():
@@ -109,6 +115,7 @@ def main():
         loop.run_forever()
     except KeyboardInterrupt:
         print(counter)
+        print(q.qsize())
         pass
 
 
