@@ -6,6 +6,7 @@ import sys
 import time
 from typing import Optional, cast
 import threading
+import random,itertools,struct
 from aioquic.asyncio import QuicConnectionProtocol
 from aioquic.quic.configuration import QuicConfiguration
 from aioquic.asyncio.client import connect
@@ -20,7 +21,7 @@ logger = logging.getLogger("client")
 # Globals for throughput calculation
 input_data = queue.Queue()
 total_bytes = 0
-id = 0
+id = -1
 start = 0
 end = 0
 dd = 0
@@ -34,32 +35,27 @@ class MyClient(QuicConnectionProtocol):
         self._ack_waiter: Optional[asyncio.Future[None]] = None
         self.offset = 0
     
-    def insert_timestamp(self,data):
+    def insert_timestamp(self,data,index):
         #inserting the offset and send time
         self.t1 =  time.time()
-        header = str(self.t1) +  "," + str(self.offset) + ","
+        header = str(self.t1) +  "," + str(self.offset) + "," + str(index) + ","
         header = header.encode()
         data = header + data
         return data
 
     # Assemble a query to send to the server
-    async def query(self,ct) -> None:
+    async def query(self,data,index) -> None:
         #print("ct",ct)
-        query = "H" * _args.query_size
-        #print("ARGS.SIZE: " + str(_args.query_size))
-        #stream_id = self._quic.get_next_available_stream_id()
-        query = query.encode()
+        query = data
+        if isinstance(query,str):
+            query = query.encode()
         stream_id = self._quic.get_next_available_stream_id()   
         logger.debug(f"Stream ID: {stream_id}")
-        # Get number of bytes to be sent to calculate throughput
-        global total_bytes
-        total_bytes = sys.getsizeof(bytes(query))
-        #print("TOTAL BYTES: " + str(total_bytes))
-        # capture start time in seconds
+        
         global start
         start = time.time()
         # Send the query to the server
-        query = self.insert_timestamp(query)
+        query = self.insert_timestamp(query,index)
         #total_bytes = sys.getsizeof(bytes(query))
         #print("TOTAL BYTES: " + str(total_bytes))
         self._quic.send_stream_data(stream_id, bytes(query), True)
@@ -109,67 +105,101 @@ class MyClient(QuicConnectionProtocol):
 #                    print("end of received")
 
 
-async def run(
-    configuration: QuicConfiguration,
-    host: str,
-    port: int,
-) -> None:
-    print(f"Connecting to {host}:{port}")
-    async with connect(
-        host,
-        port,
-        configuration=configuration,
-        create_protocol=MyClient,
-    ) as client:
-        client = cast(MyClient, client)
-        logger.debug("Sending query")
-        print("starting timer")
-        a = time.time()
-        for i in range(0,10):
-            await client.query(i)
-        b = time.time()
-        print("returned after query")
-        print(f'elapsed time: {b - a}')
-        client.close()
 
+
+class quicconnect(MyClient):
+    def __init__(self, host_addr, port_nr,configuration):
+        super().__init__(self)
+        self.host_addr = host_addr
+        self.port_nr = port_nr
+        self.configuration =configuration
+        self.frame_hist = list()
+        self.start_thread()
+    
+
+    def send_thread(self):
+            asyncio.run(self.run())
+
+    def start_thread(self):
+            self.x = threading.Thread(target=self.send_thread)
+            self.x.start()
+    
+    def send_frame(self,frame):
+        self.frame_hist.append(frame)
+
+            
+            
+
+    async def run(self):
+            async with connect(
+            self.host_addr,
+            self.port_nr,
+            configuration=self.configuration,
+            create_protocol=MyClient,
+             ) as client:
+              self.client = cast(MyClient, client)
+              while True:
+                  global id 
+                  if (len(self.frame_hist) > 0):  
+                        curr_time = time.time()
+                        id +=1
+                        data = self.frame_hist.pop(0)
+                        await self.client.query(data,id)  
+                  else:
+                      if (time.time() - curr_time > 2 ):
+                          print("Timeout")
+                          break
+                      
+                          
+
+            #self.client.close()  
+              
+
+
+class quicconnectclient():
+    def __init__(self, host_addr, port_nr,verbose):
+            logging.basicConfig(
+            format="%(asctime)s %(levelname)s %(name)s %(message)s",
+            level=logging.DEBUG if verbose else logging.INFO,)
+            self.configuration = QuicConfiguration(is_client=True) 
+            self.configuration.verify_mode = ssl.CERT_NONE
+            self.hostip = host_addr
+            self.portnr = port_nr
+            self.quic_obj = self.create_quic_server_object()
+    
+    def create_quic_server_object(self):
+            return   quicconnect(self.hostip,self.portnr,configuration=self.configuration)
+
+
+
+def randbytes(n,_struct8k=struct.Struct("!1000Q").pack_into):
+    if n<8000:
+        longs=(n+7)//8
+        return struct.pack("!%iQ"%longs,*map(
+            random.getrandbits,itertools.repeat(64,longs)))[:n]
+    data=bytearray(n);
+    for offset in range(0,n-7999,8000):
+        _struct8k(data,offset,
+            *map(random.getrandbits,itertools.repeat(64,1000)))
+    offset+=8000
+    data[offset:]=randbytes(n-offset)
+    return data
 
 
 def main():
-    print("Entered client")
-    
-
+    print("started")
     args = ParserClient.parse("Parse client args")
+    test_data = []
+    for i in range(0,20):
+        q = randbytes(n=50000)
+        test_data.append(q)
     global _args
     _args = args
-
-    logging.basicConfig(
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
-        level=logging.DEBUG if args.verbose else logging.INFO,
-    )
-
-    configuration = QuicConfiguration(
-        is_client=True
-    )
-
-    if args.ca_certs:
-        configuration.load_verify_locations(args.ca_certs)
-    if args.insecure:
-        configuration.verify_mode = ssl.CERT_NONE
-    if args.quic_log:
-        configuration.quic_logger = QuicDirectoryLogger(args.quic_log)
-    if args.secrets_log:
-        configuration.secrets_log_file = open(args.secrets_log, "a")
-
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(
-        run(
-            configuration=configuration,
-            host=args.host,
-            port=args.port,
-        )
-    )
-    
-
+    k = quicconnectclient(args.host,args.port,args.verbose)
+      
+    for i in test_data:   
+        k.quic_obj.send_frame(i)
+        time.sleep(0.03)
 
 if __name__ == "__main__":
     main()

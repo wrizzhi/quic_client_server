@@ -13,7 +13,6 @@ from typing import Counter, Optional
 from quic_logger import QuicDirectoryLogger
 
 logger = logging.getLogger("server")
-counter = 1
 dd = 0
 total_data = bytes()
 q= queue.Queue()
@@ -29,19 +28,19 @@ class MyConnection:
 
     
     def handle_event(self, event: QuicEvent) -> None:
-        global counter,total_data,dd,send_time,t2,offset
+        global total_data,dd,send_time,t2,offset
         
         if isinstance(event, StreamDataReceived):
             data = event.data
             
-            counter += 1
+           
             dd +=1
             if  ( dd == 1):
                 #print("first",data.decode())
-                send_time,offset,data=data.decode().split(",",2)
+                send_time,offset,index,data=data.decode('latin-1').split(",",3)
                 #print("s",send_time)
                 #print("o",offset)
-                #print("r",data)
+                print("frame",index,"recieved")
                 t2 = str(time.time())
                 data = data.encode()
                 t3 = str(time.time())
@@ -54,7 +53,7 @@ class MyConnection:
         
                 #print("END STREAM",event.stream_id)
                 #logger.info("END STREAM LOGGED")
-                #print("final data",sys.getsizeof(total_data))
+                print("final data",sys.getsizeof(total_data))
                 #print("total_data",total_data)
                 #print("send_time",send_time)
                 print("time_taken",float(t2) - float(send_time) + float(offset))
@@ -114,7 +113,6 @@ def main():
     try:
         loop.run_forever()
     except KeyboardInterrupt:
-        print(counter)
         print(q.qsize())
         pass
 
