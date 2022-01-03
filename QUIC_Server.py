@@ -3,7 +3,7 @@ import asyncio
 import logging
 import ssl
 import time
-import queue
+from queue import Queue
 import threading
 from aioquic.asyncio import QuicConnectionProtocol, serve
 from aioquic.quic.configuration import QuicConfiguration
@@ -21,6 +21,7 @@ send_time = 0
 t2 = 0
 offset = 0 
 index = 0
+
 
 
 
@@ -91,7 +92,7 @@ class quicserver(MyServerProtocol):
     
     def recieve(self):
         t1 = time.time()
-        while True and (time.time() - t1) < 15:
+        while True and (time.time() - t1) < 2 :
             if (len(frame_data) > 0 ):
                 t1 = time.time()
                 temp = frame_data.pop(0)
@@ -103,7 +104,7 @@ class quicserver(MyServerProtocol):
         
     def server_start(self):
         self.y = threading.Thread(target=self.quicrecieve)
-        self.y.setDaemon(True)
+        
         self.y.start()
 
     def server_send(self,id,data):
@@ -147,14 +148,36 @@ class quicconnectserver():
 
 
 
+
+def processing(server,data_queue):
+    
+    time_start = time.time()
+    
+    while True:
+        if data_queue and  time.time() - time_start < 10:
+            
+            frame = data_queue.get()
+            t2 = time.time()
+        
+            if ( frame["time_taken"] + (t2 - frame["t1"]) < 0.15):
+                time.sleep(0.03)
+                print("frame ",frame["id"]," processing")
+                #server.quic_obj.server_send(f_id,"processed")
+                time_start = time.time()
+            else:
+                print("frame ",frame["id"]," dropped")
+                #server.quic_obj.server_send(f_id,"dropped")
+
 def main():
     print("entered server code")
 
-    data = dict()
-    args = ParserServer.parse("Parse server args")
     
+    args = ParserServer.parse("Parse server args")
+    data_queue = Queue()
     j = quicconnectserver(args.host,args.port,args.certificate, args.private_key,args.verbose)
-   
+    prc_thread = threading.Thread(target=processing,args=(j,data_queue))
+    prc_thread.start()
+    
     while True:
         id,f,t=j.quic_obj.recieve()
         if id:
@@ -162,10 +185,13 @@ def main():
             temp["frame"] = f
             temp["time_taken"] = t
             temp["t1"] = time.time()
-            data[id] = temp
-            print("frame",id,"time",t)
+            temp["id"] = id
+            #print("frame",id,"time",t)
+            data_queue.put(temp)
+            
         else:
             print("End of data recieved")
+            
             
 
 if __name__ == "__main__":
