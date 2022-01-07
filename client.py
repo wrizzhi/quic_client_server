@@ -25,7 +25,7 @@ def main():
     args = ParserClient.parse("Parse client args")
     test_data = []
     for i in range(0,110):
-        q = randbytes(n=50000)
+        q = randbytes(n=80000)
         test_data.append(q)
     print(sys.getsizeof(test_data[0]))
     k = quicconnectclient(args.host,args.port,args.verbose)
