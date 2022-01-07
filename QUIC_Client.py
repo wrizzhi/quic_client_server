@@ -33,6 +33,7 @@ class MyClient(QuicConnectionProtocol):
         self.t1 =  time.time()
         header = str(self.t1) +  "," + str(self.offset) + "," + str(index) + ","
         header = header.encode()
+        print(self.t1)
         data = header + data
         return data
 
@@ -73,7 +74,7 @@ class MyClient(QuicConnectionProtocol):
                 else:
                     reply = event.data.decode()
                     server_reply.append(reply)
-                    print(reply)
+                    #print("REPLY",reply)
                 #python QUIC_Client.py -k -qsize 50000 -v
 
                 

@@ -23,7 +23,7 @@ def processing(server,data_queue):
                 server.quic_obj.server_send(server_reply)
                 time_start = time.time()
             else:
-                print("frame ",frame["id"]," dropped")
+                #print("frame ",frame["id"]," dropped")
                 server_reply = frame["id"] + "dropped"
                 server.quic_obj.server_send(server_reply)
 
@@ -45,7 +45,7 @@ def main():
             temp["time_taken"] = t
             temp["t1"] = time.time()
             temp["id"] = id
-            #print("frame",id,"time",t)
+            print("frame",id,"time",t)
             data_queue.put(temp)
             
         else:

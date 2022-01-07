@@ -1,6 +1,6 @@
 import random,itertools,struct
 import ParserClient
-from QUIC_client import quicconnectclient
+from QUIC_Client import quicconnectclient
 import time
 import sys
 
@@ -24,7 +24,7 @@ def main():
     print("started")
     args = ParserClient.parse("Parse client args")
     test_data = []
-    for i in range(0,100000):
+    for i in range(0,110):
         q = randbytes(n=50000)
         test_data.append(q)
     print(sys.getsizeof(test_data[0]))
