@@ -45,6 +45,8 @@ class MyConnection:
                 temp["data"] = total_data
                 temp["id"] = index
                 temp["time_taken"] = time_taken
+                temp["offset"] = offset
+                temp["recv_time"] = time.time()
                 frame_data.append(temp)
                 total_data = bytes()
                 ack = "frame " + str(index) + " recieved"
@@ -57,7 +59,7 @@ class MyConnection:
                 ts_data = t2 + "," + t3 
                 ts_data = ts_data.encode()
                 self._quic.send_stream_data(event.stream_id, ts_data, False)
-                total_data += data
+                total_data += data  
             else:
                 if (len(server_send_data) > 0 ):
                     sever_reply = server_send_data.pop(0)
@@ -103,8 +105,10 @@ class quicserver(MyServerProtocol):
                 frame_ret = temp["data"]
                 frame_time = temp["time_taken"]
                 frame_index = temp["id"]
-                return frame_index,frame_ret,frame_time
-        return None,None,None
+                fr_offset = temp["offset"]
+                fr_recv = temp["recv_time"] 
+                return frame_index,frame_ret,frame_time,fr_offset,fr_recv
+        return None,None,None,None,None
         
     def server_start(self):
         self.y = threading.Thread(target=self.quicrecieve)

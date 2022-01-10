@@ -29,7 +29,7 @@ def processing(server,data_queue):
 
 def main():
     #print("entered server code")
-
+    print("frame,time,offset,recv time")
     
     args = ParserServer.parse("Parse server args")
     data_queue = Queue()
@@ -38,14 +38,15 @@ def main():
     prc_thread.start()
     counter = 0
     while True:
-        id,f,t=j.quic_obj.recieve()
+        id,f,t,o,r=j.quic_obj.recieve()
         if id:
             temp = dict()
             temp["frame"] = f
             temp["time_taken"] = t
             temp["t1"] = time.time()
             temp["id"] = id
-            print("frame",id,"time",t)
+            print(id,t,o,r)
+            print("time",t)
             data_queue.put(temp)
             
         else:
