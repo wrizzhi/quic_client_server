@@ -390,7 +390,7 @@ static void slave_functions(char *host) {
     second_save.act_sec = second_save.my_sec + second_save.my_nsec*1e-9;
     third_save.act_sec = third_save.my_sec + third_save.my_nsec*1e-9;
     fourth_save.act_sec = fourth_save.my_sec + fourth_save.my_nsec*1e-9;
-    mpd = ((second_save.act_sec - first_save.act_sec) - (fourth_save.act_sec - third_save.act_sec))/2;
+    mpd = ((second_save.act_sec - first_save.act_sec) + (fourth_save.act_sec - third_save.act_sec))/2;
     offset =  second_save.act_sec - first_save.act_sec - mpd;
     printf("%fs,",second_save.act_sec - first_save.act_sec);
     printf("%fs,",fourth_save.act_sec - third_save.act_sec);
