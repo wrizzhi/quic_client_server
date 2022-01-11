@@ -36,7 +36,7 @@ class MyConnection:
             dd +=1
             if event.end_stream:
                 dd = 0
-                time_taken = time.time() - float(send_time) + float(offset)
+                time_taken = time.time() - float(send_time) - float(offset)
                 if time_taken < 0:
                     time_taken = float(t2) - float(send_time)
                 total_data += data
