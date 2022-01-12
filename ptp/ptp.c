@@ -309,7 +309,7 @@ static void master_functions(char *host) {
     while (meq_receive(&inf, packet_buffer, sizeof packet_buffer) != -1) {
     }
     printf("DELAY RESPONSE MESSAGE IS SENT WITH T4 = %s\n",str1);
-    sleep(2);
+    sleep(0.09);
   }
 }
 
@@ -397,7 +397,7 @@ static void slave_functions(char *host) {
     printf("%fs,",mpd);
     printf("%fs\n",offset);
     //printf("done\n");
-    sleep(1);
+    sleep(0.01);
   }
 }
 
