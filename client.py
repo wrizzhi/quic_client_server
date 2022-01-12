@@ -24,7 +24,7 @@ def main():
     print("started")
     args = ParserClient.parse("Parse client args")
     test_data = []
-    for i in range(0,110):
+    for i in range(0,100):
         q = randbytes(n=50000)
         test_data.append(q)
     print(sys.getsizeof(test_data[0]))
@@ -36,7 +36,7 @@ def main():
         k.quic_obj.send_frame(i)
         time.sleep(0.03)
 
-    #k.quic_obj.client_close()
+    k.quic_obj.client_close()
 
 if __name__ == "__main__":
     main()

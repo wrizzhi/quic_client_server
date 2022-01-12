@@ -70,7 +70,7 @@ class MyClient(QuicConnectionProtocol):
                     answer = event.data.decode()
                     t2,t3 = answer.split(",",2)
                     mpd = ((float(t2)- float(self.t1)) + (t4 - float(t3)))/2
-                    self.offset = (float(t2)- float(self.t1)) - mpd
+                    self.offset = (float(t2)- float(self.t1)) - mpd 
                 else:
                     reply = event.data.decode()
                     server_reply.append(reply)

@@ -8,6 +8,7 @@ from aioquic.quic.configuration import QuicConfiguration
 from aioquic.quic.connection import QuicConnection
 from aioquic.quic.events import QuicEvent, StreamDataReceived
 from typing import Counter, Optional
+import numpy as np
 
 from quic_logger import QuicDirectoryLogger
 
@@ -20,7 +21,8 @@ t2 = 0
 offset = 0 
 index = 0
 server_send_data = []
-
+hist = []
+average_offset = 0
 
 
 class MyConnection:
@@ -29,23 +31,28 @@ class MyConnection:
 
     
     def handle_event(self, event: QuicEvent) -> None:
-        global total_data,dd,send_time,t2,offset,index,server_send_data
+        global total_data,dd,send_time,t2,offset,index,server_send_data,hist,average_offset
         
         if isinstance(event, StreamDataReceived):
             data = event.data
             dd +=1
             if event.end_stream:
                 dd = 0
-                time_taken = time.time() - float(send_time) - float(offset)
-                if time_taken < 0:
-                    time_taken = float(t2) - float(send_time)
-                total_data += data
-                #print(offset)
                 temp = dict()
+                #print("offset",offset)
+                if ( len(hist)>1):
+                    k = np.average(hist[1:])
+                    time_taken = time.time() - float(send_time) - k
+                    temp["offset"] = k
+                    #print("hist ",temp["offset"])
+                else:
+                    time_taken = time.time() - float(send_time) - float(offset)
+                    temp["offset"] = float(offset)
+                    #print("not hist ",temp["offset"])
+                total_data += data
                 temp["data"] = total_data
                 temp["id"] = index
                 temp["time_taken"] = time_taken
-                temp["offset"] = offset
                 temp["recv_time"] = time.time()
                 frame_data.append(temp)
                 total_data = bytes()
@@ -53,6 +60,13 @@ class MyConnection:
                 self._quic.send_stream_data(event.stream_id, bytes(ack.encode()), True)
             elif  ( dd == 1):
                 send_time,offset,index,data=data.decode('latin-1').split(",",3)
+                if ( float(offset) != 0 ):
+                    if (len(hist) > 1):
+                        k = np.average(hist[1:])
+                        if ( abs(k) - abs(float(offset)) < 0.005 ):
+                            hist.append(float(offset))
+                    else:
+                        hist.append(float(offset))
                 t2 = str(time.time())
                 data = data.encode()
                 t3 = str(time.time())
