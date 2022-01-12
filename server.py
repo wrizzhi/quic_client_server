@@ -45,7 +45,7 @@ def main():
             temp["time_taken"] = t
             temp["t1"] = time.time()
             temp["id"] = id
-            print(id,t,o,r)
+            print(id,",",t,",",o,",",r)
             #print("time",t)
             data_queue.put(temp)
             
