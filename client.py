@@ -34,7 +34,7 @@ class MyClient(QuicConnectionProtocol):
         self.t1 = time.time()
         header = str(self.t1) + "," + str(self.offset) + "," + str(index) + ","
         header = header.encode()
-        print("current time is",self.t1)
+        #print("current time is",self.t1)
         data = header + data
         return data
 
@@ -45,7 +45,7 @@ class MyClient(QuicConnectionProtocol):
         if isinstance(query, str):
             query = query.encode()
         stream_id = self._quic.get_next_available_stream_id()
-        logger.debug(f"Stream ID: {stream_id}")
+        logger.debug(f"Next Stream ID will be : {stream_id}") 
         query = self.insert_timestamp(query, index)
         self._quic.send_stream_data(stream_id, bytes(query), True)
         waiter = self._loop.create_future()
@@ -163,7 +163,6 @@ def parse(name):
 
     parser = argparse.ArgumentParser(description="Parser for Quic Client")
 
-    parser.add_argument("-t", "--type", type=str, help="Type of record to ")
 
     parser.add_argument(
         "--host",
@@ -205,17 +204,11 @@ def parse(name):
         "-v", "--verbose", action="store_true", help="increase logging verbosity"
     )
 
-    parser.add_argument(
-        "-td",
-        "--test-dir",
-        type=str,
-        help="directory to output throughput measurements to"
-    )
 
     parser.add_argument(
-        "-qsize",
-        "--query-size",
+        "--querysize",
         type=int,
+        default=5000,
         help="Amount of data to send in bytes"
     )
     parser.add_argument(
@@ -231,14 +224,23 @@ def parse(name):
     return args
 
 def main():
-    print("started")
+    print("Client Started")
     args = parse("Parse client args")
     test_data = []
     news=args.streamrange
+    querysize=args.querysize
+    if args.quic_log:
+        from aioquic.quic import configuration
+        from aioquic.quic.logger import QuicFileLogger
+        configuration.quic_logger = QuicFileLogger(args.quic_log)
+    if args.secrets_log:
+        from aioquic.quic import configuration
+        configuration.secrets_log_file = open(args.secrets_log, "a")
+    
     for i in range(0,news):
-        q = randbytes(n=50000)
+        q = randbytes(n=querysize)
         test_data.append(q)
-    print("getting test data size",sys.getsizeof(test_data[0]))
+    print("sending test data size of "+str(sys.getsizeof(test_data[0]))+" bytes")
     k = quicconnectclient(args.host,args.port,args.verbose)
       
     for i in test_data:   

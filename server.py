@@ -231,6 +231,12 @@ def parse(name):
     )
 
     parser.add_argument(
+        "-l",
+        "--secrets-log",
+        type=str,
+        help="log secrets to a file, for use with Wireshark",
+    )
+    parser.add_argument(
         "-v", "--verbose", action="store_true", help="increase logging verbosity"
     )
 
@@ -243,8 +249,19 @@ def main():
     print("frame,time,offset,recv time")
     
     args = parse("Parse server args")
+    if args.quic_log:
+        quic_logger=args.quic_log
+    else:
+        quic_logger = None
+
+    # open SSL log file
+    if args.secrets_log:
+        secrets_log_file = open(args.secrets_log, "a")
+    else:
+        secrets_log_file = None
+
     data_queue = Queue()
-    j = quicconnectserver(args.host,args.port,args.certificate, args.private_key,args.verbose)
+    j = quicconnectserver(args.host,args.port,args.certificate, args.private_key,args.verbose,qlog=quic_logger)
     prc_thread = threading.Thread(target=processing,args=(j,data_queue))
     prc_thread.start()
     counter = 0
