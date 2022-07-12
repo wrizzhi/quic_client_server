@@ -236,7 +236,10 @@ def main():
     if args.secrets_log:
         from aioquic.quic import configuration
         configuration.secrets_log_file = open(args.secrets_log, "a")
-    
+    if args.insecure:
+        from aioquic.quic import configuration
+        configuration.verify_mode = ssl.CERT_NONE
+
     for i in range(0,news):
         q = randbytes(n=querysize)
         test_data.append(q)
