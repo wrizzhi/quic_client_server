@@ -11,7 +11,7 @@ from aioquic.asyncio import QuicConnectionProtocol
 from aioquic.quic.configuration import QuicConfiguration
 from aioquic.asyncio.client import connect
 from aioquic.quic.events import QuicEvent, StreamDataReceived
-
+from aioquic.quic.logger import QuicFileLogger
 logger = logging.getLogger("client")
 
 id = 0
@@ -129,11 +129,14 @@ class quicconnect(MyClient):
 
 
 class quicconnectclient():
-    def __init__(self, host_addr, port_nr, verbose,md,msd):
+    def __init__(self, host_addr, port_nr, verbose,md,msd,qlog):
         logging.basicConfig(
             format="%(asctime)s %(levelname)s %(name)s %(message)s",
             level=logging.DEBUG if verbose else logging.INFO, )
-        self.configuration = QuicConfiguration(is_client=True)
+        if qlog:
+            self.configuration = QuicConfiguration(is_client=True, quic_logger=QuicFileLogger(qlog))
+        else:
+            self.configuration = QuicConfiguration(is_client=True, quic_logger=None)
         self.configuration.verify_mode = ssl.CERT_NONE
         self.hostip = host_addr
         self.portnr = port_nr
@@ -259,7 +262,7 @@ def main():
         q = randbytes(n=querysize)
         test_data.append(q)
     print("sending test data size of " + str(int(str(sys.getsizeof(test_data[0])))/float(1<<20)) + " MB")
-    k = quicconnectclient(args.host,args.port,args.verbose,args.maxdata,args.maxstreamdata)
+    k = quicconnectclient(args.host,args.port,args.verbose,args.maxdata,args.maxstreamdata,args.quic_log)
       
     for i in test_data:   
         #print(i)
