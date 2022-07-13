@@ -129,7 +129,7 @@ class quicconnect(MyClient):
 
 
 class quicconnectclient():
-    def __init__(self, host_addr, port_nr, verbose):
+    def __init__(self, host_addr, port_nr, verbose,md,msd):
         logging.basicConfig(
             format="%(asctime)s %(levelname)s %(name)s %(message)s",
             level=logging.DEBUG if verbose else logging.INFO, )
@@ -138,6 +138,9 @@ class quicconnectclient():
         self.hostip = host_addr
         self.portnr = port_nr
         self.quic_obj = self.create_quic_server_object()
+        self.configuration.max_data= md
+        self.configuration.max_stream_data=msd
+
 
     def create_quic_server_object(self):
         return quicconnect(self.hostip, self.portnr, configuration=self.configuration)
@@ -215,9 +218,21 @@ def parse(name):
         "--streamrange",
         type=int,
         default=100,
-        help="no of times streams wanted to send"
+        help="no of times querysize data  wanted to send"
     )
 
+    parser.add_argument(
+        "--maxdata",
+        type=int,
+        default=1048576,
+        help="connection-wide flow control limit (default: %d)" % QuicConfiguration.max_data,
+    )
+    parser.add_argument(
+        "--maxstreamdata",
+        type=int,
+        default=1048576,
+        help="per-stream flow control limit (default: %d)" % QuicConfiguration.max_stream_data,
+    )
 
     args = parser.parse_args()
 
@@ -243,12 +258,12 @@ def main():
     for i in range(0,news):
         q = randbytes(n=querysize)
         test_data.append(q)
-    print("sending test data size of "+str(sys.getsizeof(test_data[0]))+" bytes")
-    k = quicconnectclient(args.host,args.port,args.verbose)
+    print("sending test data size of " + str(int(str(sys.getsizeof(test_data[0])))/float(1<<20)) + " MB")
+    k = quicconnectclient(args.host,args.port,args.verbose,args.maxdata,args.maxstreamdata)
       
     for i in test_data:   
         #print(i)
-
+        print("sending test data ",len(test_data)," times")
         k.quic_obj.send_frame(i)
         time.sleep(0.03)
 
