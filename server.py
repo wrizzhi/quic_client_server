@@ -145,7 +145,7 @@ class quicserver(MyServerProtocol):
 
 
 class quicconnectserver():
-    def __init__(self, host, port, certificate, private_key, verbose, qlog=None):
+    def __init__(self, host, port, certificate, private_key, verbose, qlog):
         logging.basicConfig(
             format="%(asctime)s %(levelname)s %(name)s %(message)s",
             level=logging.DEBUG if verbose else logging.INFO, )
@@ -251,8 +251,6 @@ def main():
     args = parse("Parse server args")
     if args.quic_log:
         quic_logger=args.quic_log
-    else:
-        quic_logger = None
 
     # open SSL log file
     if args.secrets_log:
@@ -261,7 +259,7 @@ def main():
         secrets_log_file = None
 
     data_queue = Queue()
-    j = quicconnectserver(args.host,args.port,args.certificate, args.private_key,args.verbose,qlog=quic_logger)
+    j = quicconnectserver(args.host,args.port,args.certificate, args.private_key,args.verbose,args.quic_log)
     prc_thread = threading.Thread(target=processing,args=(j,data_queue))
     prc_thread.start()
     counter = 0
